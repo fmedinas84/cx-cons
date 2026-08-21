@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tienda ficticia para aprender a integrar pagos online.">
+  <title>Sticker Quest Checkout</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="store-shell">
+    <header class="topbar">
+      <a class="brand" href="#inicio" aria-label="Sticker Quest, inicio">
+        <span class="brand-mark" aria-hidden="true">SQ</span>
+        <span>Sticker Quest</span>
+      </a>
+      <span class="test-badge"><i></i> Modo práctica</span>
+    </header>
+
+    <section class="checkout" id="inicio">
+      <div class="product-visual">
+        <div class="visual-label"><span>EDICIÓN 01</span><span>ARCADE CREW</span></div>
+        <img src="https://cx-cons-stickers.fmedinas515625.chatgpt.site/sticker-pack.png" alt="Cuatro stickers de personajes originales inspirados en videojuegos retro">
+        <span class="spark spark-one">✦</span><span class="spark spark-two">✦</span>
+      </div>
+
+      <div class="product-info">
+        <p class="eyebrow">Colección arcade · Pack de 4 stickers</p>
+        <h1>Personajes listos para otra partida.</h1>
+        <p class="intro">Un pequeño pack de stickers ficticios creado para aprender cómo funciona una compra online de principio a fin.</p>
+        <div class="price-row"><strong>$100</strong><span>por pack</span></div>
+
+        <fieldset class="quantity-fieldset">
+          <legend>Cantidad</legend>
+          <div class="quantity-options" role="radiogroup" aria-label="Selecciona la cantidad">
+            <button class="quantity active" type="button" role="radio" aria-checked="true" data-quantity="1">1</button>
+            <button class="quantity" type="button" role="radio" aria-checked="false" data-quantity="2">2</button>
+            <button class="quantity" type="button" role="radio" aria-checked="false" data-quantity="3">3</button>
+            <button class="quantity" type="button" role="radio" aria-checked="false" data-quantity="4">4</button>
+          </div>
+        </fieldset>
+
+        <div class="summary" aria-live="polite">
+          <div><span id="line-item">Pack Arcade Crew × 1</span><span>$100 c/u</span></div>
+          <div class="total-row"><span>Total</span><strong id="total">$100</strong></div>
+        </div>
+
+        <button class="pay-button" id="pay-button" type="button">Continuar al pago <span aria-hidden="true">→</span></button>
+        <p class="payment-note">◇ Demostración: todavía no se realizará ningún cobro.</p>
+      </div>
+    </section>
+
+    <footer><span>Producto y personajes ficticios</span><span>Hecho para aprender pagos online</span></footer>
+  </main>
+
+  <div class="modal-backdrop" id="modal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+      <button class="modal-close" id="modal-close" type="button" aria-label="Cerrar">×</button>
+      <span class="modal-icon" aria-hidden="true">✓</span>
+      <p class="eyebrow">Frontend listo</p>
+      <h2 id="demo-title">Aquí comenzará Mercado Pago</h2>
+      <p id="demo-copy"></p>
+      <button type="button" class="modal-action" id="modal-action">Volver a la tienda</button>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
