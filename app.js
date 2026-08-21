@@ -2,8 +2,8 @@ const UNIT_PRICE = 100;
 const quantityButtons = [...document.querySelectorAll("[data-quantity]")];
 const lineItem = document.querySelector("#line-item");
 const totalLabel = document.querySelector("#total");
-const modal = document.querySelector("#modal");
-const demoCopy = document.querySelector("#demo-copy");
+const payButton = document.querySelector("#pay-button");
+const paymentStatus = document.querySelector("#payment-status");
 let quantity = 1;
 
 const clp = new Intl.NumberFormat("es-CL", {
@@ -27,23 +27,27 @@ quantityButtons.forEach((button) => {
   button.addEventListener("click", () => selectQuantity(Number(button.dataset.quantity)));
 });
 
-document.querySelector("#pay-button").addEventListener("click", () => {
-  const noun = quantity === 1 ? "pack" : "packs";
-  demoCopy.innerHTML = `Seleccionaste ${quantity} ${noun} por un total de <strong>${clp.format(UNIT_PRICE * quantity)}</strong>. En la siguiente etapa, este botón pedirá al servidor que cree la preferencia de pago.`;
-  modal.hidden = false;
-  document.querySelector("#modal-close").focus();
-});
+payButton.addEventListener("click", async () => {
+  payButton.disabled = true;
+  payButton.firstChild.textContent = "Preparando pago ";
+  paymentStatus.textContent = "";
 
-function closeModal() {
-  modal.hidden = true;
-  document.querySelector("#pay-button").focus();
-}
+  try {
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity }),
+    });
+    const data = await response.json();
 
-document.querySelector("#modal-close").addEventListener("click", closeModal);
-document.querySelector("#modal-action").addEventListener("click", closeModal);
-modal.addEventListener("click", (event) => {
-  if (event.target === modal) closeModal();
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !modal.hidden) closeModal();
+    if (!response.ok || !data.init_point) {
+      throw new Error(data.error || "No se pudo iniciar el pago.");
+    }
+
+    window.location.assign(data.init_point);
+  } catch (error) {
+    paymentStatus.textContent = error.message || "No se pudo iniciar el pago. Intenta nuevamente.";
+    payButton.disabled = false;
+    payButton.firstChild.textContent = "Pagar ";
+  }
 });
