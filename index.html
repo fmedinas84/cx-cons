@@ -6,6 +6,7 @@
   <meta name="description" content="Tienda ficticia para aprender a integrar pagos online.">
   <title>Sticker Quest Checkout</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="checkout-bricks.css">
 </head>
 <body>
   <main class="store-shell">
@@ -45,8 +46,28 @@
           <div class="total-row"><span>Total</span><strong id="total">$100</strong></div>
         </div>
 
-        <button class="pay-button" id="pay-button" type="button">Pagar <span aria-hidden="true">→</span></button>
-        <p class="payment-note">◇ Serás redirigido a Mercado Pago para completar el pago.</p>
+        <section class="payment-panel" aria-labelledby="payment-title">
+          <div class="payment-panel-heading">
+            <div>
+              <p class="eyebrow">Checkout Bricks</p>
+              <h2 id="payment-title">Paga sin salir de la tienda</h2>
+            </div>
+            <span class="secure-label">Pago seguro</span>
+          </div>
+
+          <p class="payment-loading" id="payment-loading" role="status">Cargando formulario de pago…</p>
+          <div id="paymentBrick_container"></div>
+
+          <div class="payment-result" id="payment-result" role="status" aria-live="polite" hidden>
+            <span class="result-icon" id="result-icon" aria-hidden="true"></span>
+            <h3 id="result-title"></h3>
+            <p id="result-description"></p>
+            <dl id="result-details"></dl>
+            <button class="retry-button" id="retry-payment" type="button" hidden>Intentar nuevamente</button>
+          </div>
+        </section>
+
+        <p class="payment-note">◇ Los datos de tu tarjeta son procesados directamente por Mercado Pago.</p>
         <p class="payment-status" id="payment-status" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -54,6 +75,7 @@
     <footer><span>Producto y personajes ficticios</span><span>Hecho para aprender pagos online</span></footer>
   </main>
 
+  <script src="https://sdk.mercadopago.com/js/v2"></script>
   <script src="app.js"></script>
 </body>
 </html>

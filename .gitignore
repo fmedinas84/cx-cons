@@ -2,5 +2,6 @@ node_modules/
 .vercel/
 
 # Credenciales y variables locales
-.env.local
-.env.*.local
+.env
+.env.*
+!.env.example
