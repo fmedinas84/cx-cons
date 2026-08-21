@@ -45,24 +45,15 @@
           <div class="total-row"><span>Total</span><strong id="total">$100</strong></div>
         </div>
 
-        <button class="pay-button" id="pay-button" type="button">Continuar al pago <span aria-hidden="true">→</span></button>
-        <p class="payment-note">◇ Demostración: todavía no se realizará ningún cobro.</p>
+        <button class="pay-button" id="pay-button" type="button">Pagar <span aria-hidden="true">→</span></button>
+        <p class="payment-note">◇ Serás redirigido a Mercado Pago para completar el pago.</p>
+        <p class="payment-status" id="payment-status" role="status" aria-live="polite"></p>
       </div>
     </section>
 
     <footer><span>Producto y personajes ficticios</span><span>Hecho para aprender pagos online</span></footer>
   </main>
 
-  <div class="modal-backdrop" id="modal" hidden>
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-title">
-      <button class="modal-close" id="modal-close" type="button" aria-label="Cerrar">×</button>
-      <span class="modal-icon" aria-hidden="true">✓</span>
-      <p class="eyebrow">Frontend listo</p>
-      <h2 id="demo-title">Aquí comenzará Mercado Pago</h2>
-      <p id="demo-copy"></p>
-      <button type="button" class="modal-action" id="modal-action">Volver a la tienda</button>
-    </section>
-  </div>
   <script src="app.js"></script>
 </body>
 </html>
