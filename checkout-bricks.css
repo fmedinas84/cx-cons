@@ -1,0 +1,155 @@
+.quantity:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.payment-panel {
+  margin-top: 28px;
+  padding: 24px;
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.payment-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.payment-panel-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.payment-panel-heading h2 {
+  font-size: 30px;
+}
+
+.secure-label {
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #e2f5e9;
+  color: #176b3a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.payment-loading {
+  margin: 18px 0;
+  color: #6b7183;
+  font-size: 13px;
+  text-align: center;
+}
+
+.payment-result {
+  padding: 24px 0 4px;
+  text-align: center;
+}
+
+.result-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 3px 3px 0 var(--ink);
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.payment-result.is-approved .result-icon {
+  background: #8fddb0;
+}
+
+.payment-result.is-pending .result-icon {
+  background: var(--yellow);
+}
+
+.payment-result.is-rejected .result-icon {
+  background: #ff9b8e;
+}
+
+.payment-result h3 {
+  margin: 0;
+  font: 700 30px/1.1 Georgia, serif;
+}
+
+.payment-result > p {
+  color: #5d6475;
+  line-height: 1.5;
+}
+
+.payment-result dl {
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.payment-result dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 5px 0;
+}
+
+.payment-result dt {
+  color: #6b7183;
+  font-size: 12px;
+}
+
+.payment-result dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.retry-button {
+  margin-top: 20px;
+  padding: 13px 18px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--yellow);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.retry-button:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  .payment-panel {
+    padding: 18px;
+  }
+
+  .payment-panel-heading {
+    display: block;
+  }
+
+  .secure-label {
+    display: inline-flex;
+    margin-top: 12px;
+  }
+
+  .payment-panel-heading h2 {
+    font-size: 27px;
+  }
+}

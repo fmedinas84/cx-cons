@@ -2,9 +2,21 @@ const UNIT_PRICE = 100;
 const quantityButtons = [...document.querySelectorAll("[data-quantity]")];
 const lineItem = document.querySelector("#line-item");
 const totalLabel = document.querySelector("#total");
-const payButton = document.querySelector("#pay-button");
 const paymentStatus = document.querySelector("#payment-status");
+const paymentLoading = document.querySelector("#payment-loading");
+const paymentContainer = document.querySelector("#paymentBrick_container");
+const paymentResult = document.querySelector("#payment-result");
+const resultIcon = document.querySelector("#result-icon");
+const resultTitle = document.querySelector("#result-title");
+const resultDescription = document.querySelector("#result-description");
+const resultDetails = document.querySelector("#result-details");
+const retryButton = document.querySelector("#retry-payment");
+
 let quantity = 1;
+let bricksBuilder;
+let paymentBrickController;
+let currentIdempotencyKey;
+let renderVersion = 0;
 
 const clp = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -12,7 +24,15 @@ const clp = new Intl.NumberFormat("es-CL", {
   maximumFractionDigits: 0,
 });
 
+function setQuantityDisabled(disabled) {
+  quantityButtons.forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
 function selectQuantity(nextQuantity) {
+  if (nextQuantity === quantity) return;
+
   quantity = nextQuantity;
   quantityButtons.forEach((button) => {
     const selected = Number(button.dataset.quantity) === quantity;
@@ -21,33 +41,251 @@ function selectQuantity(nextQuantity) {
   });
   lineItem.textContent = `Pack Arcade Crew × ${quantity}`;
   totalLabel.textContent = clp.format(UNIT_PRICE * quantity);
+  currentIdempotencyKey = undefined;
+  resetResult();
+  renderPaymentBrick();
+}
+
+function createIdempotencyKey() {
+  if (!currentIdempotencyKey) {
+    currentIdempotencyKey = crypto.randomUUID();
+  }
+
+  return currentIdempotencyKey;
+}
+
+function summarizeBrickFormData(formData) {
+  return {
+    fields: Object.keys(formData ?? {}).sort(),
+    token_present: Boolean(formData?.token),
+    payment_method_id: formData?.payment_method_id,
+    issuer_id: formData?.issuer_id,
+    installments: formData?.installments,
+    payer_email_present: Boolean(formData?.payer?.email),
+    payer_identification_type: formData?.payer?.identification?.type,
+    payer_identification_present: Boolean(formData?.payer?.identification?.number),
+  };
+}
+
+function formatDiagnostic(diagnostic) {
+  if (!diagnostic) return "";
+
+  const parts = [
+    diagnostic.http_status ? `HTTP ${diagnostic.http_status}` : "",
+    diagnostic.status ? `estado ${diagnostic.status}` : "",
+    diagnostic.status_detail ? `detalle ${diagnostic.status_detail}` : "",
+    diagnostic.error_code ? `código ${diagnostic.error_code}` : "",
+    diagnostic.message || "",
+  ].filter(Boolean);
+
+  const causes = Array.isArray(diagnostic.cause)
+    ? diagnostic.cause
+        .map((cause) => [cause.code, cause.description].filter(Boolean).join(": "))
+        .filter(Boolean)
+        .join("; ")
+    : "";
+
+  if (causes) parts.push(`causa ${causes}`);
+  return parts.join(" · ");
+}
+
+function resetResult() {
+  paymentResult.hidden = true;
+  retryButton.hidden = true;
+  paymentContainer.hidden = false;
+  paymentStatus.textContent = "";
+}
+
+function showPaymentResult({ payment_id, status, status_detail }) {
+  const presentation = {
+    approved: {
+      icon: "✓",
+      title: "Pago aprobado",
+      description: "Mercado Pago confirmó el pago de tus stickers ficticios.",
+      className: "is-approved",
+    },
+    pending: {
+      icon: "…",
+      title: "Pago pendiente",
+      description: "Mercado Pago todavía está procesando el pago.",
+      className: "is-pending",
+    },
+    rejected: {
+      icon: "×",
+      title: "Pago rechazado",
+      description: "Mercado Pago no pudo aprobar este intento de pago.",
+      className: "is-rejected",
+    },
+  };
+  const normalizedStatus = ["pending", "in_process"].includes(status) ? "pending" : status;
+  const content = presentation[normalizedStatus] ?? {
+    icon: "?",
+    title: "Resultado recibido",
+    description: "Mercado Pago devolvió un estado que debes revisar.",
+    className: "is-pending",
+  };
+
+  paymentResult.className = `payment-result ${content.className}`;
+  paymentResult.hidden = false;
+  paymentContainer.hidden = true;
+  paymentLoading.hidden = true;
+  resultIcon.textContent = content.icon;
+  resultTitle.textContent = content.title;
+  resultDescription.textContent = content.description;
+  resultDetails.innerHTML = "";
+
+  const details = [
+    ["Payment ID", payment_id ?? "No disponible"],
+    ["Estado", status ?? "No disponible"],
+    ["Detalle", status_detail ?? "No disponible"],
+  ];
+  details.forEach(([label, value]) => {
+    const wrapper = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = label;
+    description.textContent = String(value);
+    wrapper.append(term, description);
+    resultDetails.append(wrapper);
+  });
+
+  retryButton.hidden = normalizedStatus === "approved";
+}
+
+async function submitPayment(formData) {
+  setQuantityDisabled(true);
+  paymentStatus.textContent = "Procesando el pago…";
+
+  try {
+    const response = await fetch("/api/payment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": createIdempotencyKey(),
+      },
+      body: JSON.stringify({
+        quantity,
+        token: formData.token,
+        issuer_id: formData.issuer_id,
+        payment_method_id: formData.payment_method_id,
+        installments: formData.installments,
+        payer: formData.payer,
+      }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status < 500) currentIdempotencyKey = undefined;
+      const diagnosticText = formatDiagnostic(data.diagnostic);
+      throw new Error(
+        [data.error || "No se pudo procesar el pago.", diagnosticText].filter(Boolean).join(" "),
+      );
+    }
+
+    currentIdempotencyKey = undefined;
+    paymentStatus.textContent = "";
+    showPaymentResult(data);
+  } catch (error) {
+    paymentStatus.textContent = error.message || "No se pudo procesar el pago. Intenta nuevamente.";
+    throw error;
+  } finally {
+    setQuantityDisabled(false);
+  }
+}
+
+async function renderPaymentBrick() {
+  if (!bricksBuilder) return;
+
+  const version = ++renderVersion;
+  setQuantityDisabled(true);
+  paymentLoading.hidden = false;
+  paymentLoading.textContent = "Cargando formulario de pago…";
+  paymentContainer.hidden = false;
+  paymentStatus.textContent = "";
+
+  try {
+    if (paymentBrickController) {
+      await paymentBrickController.unmount();
+      paymentBrickController = undefined;
+    }
+
+    if (version !== renderVersion) return;
+
+    paymentBrickController = await bricksBuilder.create("payment", "paymentBrick_container", {
+      initialization: {
+        amount: UNIT_PRICE * quantity,
+      },
+      customization: {
+        visual: {
+          style: { theme: "default" },
+        },
+        paymentMethods: {
+          creditCard: "all",
+          debitCard: "all",
+        },
+      },
+      callbacks: {
+        onReady: () => {
+          paymentLoading.hidden = true;
+          setQuantityDisabled(false);
+        },
+        onSubmit: ({ formData }) => {
+          console.info("Datos seguros recibidos desde Checkout Bricks:", summarizeBrickFormData(formData));
+          return submitPayment(formData);
+        },
+        onError: (error) => {
+          console.error("Error seguro de Checkout Bricks:", {
+            name: error?.name,
+            message: error?.message,
+            type: error?.type,
+          });
+          paymentLoading.hidden = true;
+          setQuantityDisabled(false);
+          paymentStatus.textContent = "No pudimos cargar el formulario de Mercado Pago.";
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error al inicializar Checkout Bricks:", error);
+    paymentLoading.hidden = true;
+    setQuantityDisabled(false);
+    paymentStatus.textContent = "No pudimos cargar el formulario de Mercado Pago.";
+  }
+}
+
+async function initializeCheckoutBricks() {
+  try {
+    if (!window.MercadoPago) {
+      throw new Error("El SDK de Mercado Pago no está disponible.");
+    }
+
+    const response = await fetch("/api/config", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.mercadoPagoPublicKey) {
+      throw new Error(data.error || "Falta la Public Key de Mercado Pago.");
+    }
+
+    console.info("Modo seguro de la Public Key de Mercado Pago:", data.credential_mode);
+
+    const mercadoPago = new window.MercadoPago(data.mercadoPagoPublicKey, {
+      locale: "es-CL",
+    });
+    bricksBuilder = mercadoPago.bricks();
+    await renderPaymentBrick();
+  } catch (error) {
+    paymentLoading.hidden = true;
+    paymentStatus.textContent = error.message || "No pudimos iniciar Checkout Bricks.";
+  }
 }
 
 quantityButtons.forEach((button) => {
   button.addEventListener("click", () => selectQuantity(Number(button.dataset.quantity)));
 });
 
-payButton.addEventListener("click", async () => {
-  payButton.disabled = true;
-  payButton.firstChild.textContent = "Preparando pago ";
-  paymentStatus.textContent = "";
-
-  try {
-    const response = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantity }),
-    });
-    const data = await response.json();
-
-    if (!response.ok || !data.init_point) {
-      throw new Error(data.error || "No se pudo iniciar el pago.");
-    }
-
-    window.location.assign(data.init_point);
-  } catch (error) {
-    paymentStatus.textContent = error.message || "No se pudo iniciar el pago. Intenta nuevamente.";
-    payButton.disabled = false;
-    payButton.firstChild.textContent = "Pagar ";
-  }
+retryButton.addEventListener("click", async () => {
+  currentIdempotencyKey = undefined;
+  resetResult();
+  await renderPaymentBrick();
 });
+
+initializeCheckoutBricks();
