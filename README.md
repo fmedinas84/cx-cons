@@ -39,6 +39,12 @@ Tarjetas vigentes y escenarios de prueba: https://www.mercadopago.cl/developers/
 - Cada intento usa `X-Idempotency-Key`. Si una solicitud queda con resultado incierto por un error de red o servidor, el siguiente intento reutiliza la misma clave para evitar un cobro duplicado.
 - No hay webhook, Supabase ni persistencia de órdenes en esta etapa.
 
+## Diagnóstico temporal
+
+La rama de Checkout Bricks registra únicamente metadatos seguros del intento: monto recalculado, medio de pago, cuotas, presencia de token y documento, y la respuesta de Mercado Pago (`payment_id`, `status`, `status_detail`, código y causas). Nunca registra el Access Token, el token completo de la tarjeta, número de tarjeta, CVV ni correo del pagador.
+
+En desarrollo local y despliegues Preview, `/api/payment` devuelve un objeto `diagnostic` seguro cuando Mercado Pago rechaza la solicitud. En producción ese detalle no se entrega al navegador.
+
 ## Pruebas automatizadas
 
 Ejecuta `npm test` para comprobar cantidades, cálculo del monto, validación de idempotencia y separación entre Public Key y Access Token.

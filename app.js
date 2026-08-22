@@ -54,6 +54,41 @@ function createIdempotencyKey() {
   return currentIdempotencyKey;
 }
 
+function summarizeBrickFormData(formData) {
+  return {
+    fields: Object.keys(formData ?? {}).sort(),
+    token_present: Boolean(formData?.token),
+    payment_method_id: formData?.payment_method_id,
+    issuer_id: formData?.issuer_id,
+    installments: formData?.installments,
+    payer_email_present: Boolean(formData?.payer?.email),
+    payer_identification_type: formData?.payer?.identification?.type,
+    payer_identification_present: Boolean(formData?.payer?.identification?.number),
+  };
+}
+
+function formatDiagnostic(diagnostic) {
+  if (!diagnostic) return "";
+
+  const parts = [
+    diagnostic.http_status ? `HTTP ${diagnostic.http_status}` : "",
+    diagnostic.status ? `estado ${diagnostic.status}` : "",
+    diagnostic.status_detail ? `detalle ${diagnostic.status_detail}` : "",
+    diagnostic.error_code ? `código ${diagnostic.error_code}` : "",
+    diagnostic.message || "",
+  ].filter(Boolean);
+
+  const causes = Array.isArray(diagnostic.cause)
+    ? diagnostic.cause
+        .map((cause) => [cause.code, cause.description].filter(Boolean).join(": "))
+        .filter(Boolean)
+        .join("; ")
+    : "";
+
+  if (causes) parts.push(`causa ${causes}`);
+  return parts.join(" · ");
+}
+
 function resetResult() {
   paymentResult.hidden = true;
   retryButton.hidden = true;
@@ -141,7 +176,10 @@ async function submitPayment(formData) {
 
     if (!response.ok) {
       if (response.status < 500) currentIdempotencyKey = undefined;
-      throw new Error(data.error || "No se pudo procesar el pago.");
+      const diagnosticText = formatDiagnostic(data.diagnostic);
+      throw new Error(
+        [data.error || "No se pudo procesar el pago.", diagnosticText].filter(Boolean).join(" "),
+      );
     }
 
     currentIdempotencyKey = undefined;
@@ -191,9 +229,16 @@ async function renderPaymentBrick() {
           paymentLoading.hidden = true;
           setQuantityDisabled(false);
         },
-        onSubmit: ({ formData }) => submitPayment(formData),
+        onSubmit: ({ formData }) => {
+          console.info("Datos seguros recibidos desde Checkout Bricks:", summarizeBrickFormData(formData));
+          return submitPayment(formData);
+        },
         onError: (error) => {
-          console.error("Error de Checkout Bricks:", error);
+          console.error("Error seguro de Checkout Bricks:", {
+            name: error?.name,
+            message: error?.message,
+            type: error?.type,
+          });
           paymentLoading.hidden = true;
           setQuantityDisabled(false);
           paymentStatus.textContent = "No pudimos cargar el formulario de Mercado Pago.";
@@ -219,6 +264,8 @@ async function initializeCheckoutBricks() {
     if (!response.ok || !data.mercadoPagoPublicKey) {
       throw new Error(data.error || "Falta la Public Key de Mercado Pago.");
     }
+
+    console.info("Modo seguro de la Public Key de Mercado Pago:", data.credential_mode);
 
     const mercadoPago = new window.MercadoPago(data.mercadoPagoPublicKey, {
       locale: "es-CL",

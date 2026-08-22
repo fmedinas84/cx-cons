@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import configHandler from "../api/config.js";
+import configHandler, { classifyCredentialMode } from "../api/config.js";
 import paymentHandler, {
   buildPaymentBody,
   calculateTransactionAmount,
+  extractMercadoPagoError,
+  shouldReturnDiagnostics,
   validateIdempotencyKey,
   validateQuantity,
 } from "../api/payment.js";
@@ -62,6 +64,44 @@ test("calcula el monto exclusivamente en el backend", () => {
   assert.equal(body.description, "Stickers de personajes de videojuegos");
   assert.equal(body.payment_method_id, "visa");
   assert.equal(body.issuer_id, 123);
+  assert.equal(typeof body.transaction_amount, "number");
+  assert.equal(typeof body.installments, "number");
+  assert.equal(typeof body.issuer_id, "number");
+  assert.equal(typeof body.payer.email, "string");
+  assert.equal(typeof body.payer.identification.type, "string");
+  assert.equal(typeof body.payer.identification.number, "string");
+});
+
+test("extrae diagnóstico de Mercado Pago sin incluir campos sensibles", () => {
+  const diagnostic = extractMercadoPagoError({
+    status: 401,
+    error: "unauthorized",
+    message: "Unauthorized use of live credentials APP_USR-secret-value",
+    causes: [
+      {
+        code: "credential_error",
+        description: "Revisa la credencial",
+        data: "token-completo-que-no-debe-aparecer",
+      },
+    ],
+  });
+
+  assert.deepEqual(diagnostic, {
+    http_status: 401,
+    status: undefined,
+    status_detail: undefined,
+    error_code: "unauthorized",
+    message: "Unauthorized use of live credentials [credential redacted]",
+    cause: [{ code: "credential_error", description: "Revisa la credencial" }],
+  });
+  assert.equal(JSON.stringify(diagnostic).includes("token-completo"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("APP_USR-secret-value"), false);
+});
+
+test("devuelve diagnóstico solamente en desarrollo o preview", () => {
+  assert.equal(shouldReturnDiagnostics({ NODE_ENV: "development" }), true);
+  assert.equal(shouldReturnDiagnostics({ NODE_ENV: "production", VERCEL_ENV: "preview" }), true);
+  assert.equal(shouldReturnDiagnostics({ NODE_ENV: "production", VERCEL_ENV: "production" }), false);
 });
 
 test("acepta una clave idempotente segura y rechaza valores inválidos", () => {
@@ -119,6 +159,7 @@ test("el endpoint público de configuración nunca devuelve el Access Token", ()
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.payload, {
       mercadoPagoPublicKey: "public-key-placeholder",
+      credential_mode: "unknown",
     });
     assert.equal(JSON.stringify(response.payload).includes("secret-token-placeholder"), false);
   } finally {
@@ -127,4 +168,11 @@ test("el endpoint público de configuración nunca devuelve el Access Token", ()
     if (originalAccessToken === undefined) delete process.env.MERCADOPAGO_ACCESS_TOKEN;
     else process.env.MERCADOPAGO_ACCESS_TOKEN = originalAccessToken;
   }
+});
+
+test("clasifica el entorno de las credenciales sin devolver sus valores", () => {
+  assert.equal(classifyCredentialMode("TEST-public-key-placeholder"), "test");
+  assert.equal(classifyCredentialMode("APP_USR-access-token-placeholder"), "production");
+  assert.equal(classifyCredentialMode("otro-formato"), "unknown");
+  assert.equal(classifyCredentialMode(undefined), "missing");
 });

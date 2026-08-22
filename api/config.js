@@ -1,3 +1,10 @@
+export function classifyCredentialMode(value) {
+  if (typeof value !== "string") return "missing";
+  if (value.startsWith("TEST-")) return "test";
+  if (value.startsWith("APP_USR-")) return "production";
+  return "unknown";
+}
+
 export default function handler(request, response) {
   if (request.method !== "GET") {
     response.setHeader("Allow", "GET");
@@ -13,6 +20,17 @@ export default function handler(request, response) {
     });
   }
 
+  const publicKeyMode = classifyCredentialMode(publicKey);
+  const accessTokenMode = classifyCredentialMode(process.env.MERCADOPAGO_ACCESS_TOKEN);
+  console.info("Modos seguros de credenciales de Mercado Pago:", {
+    public_key_mode: publicKeyMode,
+    access_token_mode: accessTokenMode,
+    modes_match: publicKeyMode === accessTokenMode,
+  });
+
   response.setHeader("Cache-Control", "no-store");
-  return response.status(200).json({ mercadoPagoPublicKey: publicKey });
+  return response.status(200).json({
+    mercadoPagoPublicKey: publicKey,
+    credential_mode: publicKeyMode,
+  });
 }

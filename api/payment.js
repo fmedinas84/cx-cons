@@ -2,6 +2,7 @@ import { MercadoPagoConfig, Payment } from "mercadopago";
 
 const PRODUCT_TITLE = "Stickers de personajes de videojuegos";
 const UNIT_PRICE_CLP = 100;
+const MAX_DIAGNOSTIC_TEXT_LENGTH = 300;
 
 export function validateQuantity(value) {
   return Number.isInteger(value) && value >= 1 && value <= 4;
@@ -31,6 +32,62 @@ function getHeader(request, name) {
 
 function isNonEmptyString(value, maxLength = 255) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
+}
+
+function sanitizeDiagnosticText(value) {
+  if (typeof value !== "string") return undefined;
+
+  return value
+    .replace(/(?:TEST-|APP_USR-)[a-zA-Z0-9_-]+/g, "[credential redacted]")
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[card data redacted]")
+    .slice(0, MAX_DIAGNOSTIC_TEXT_LENGTH);
+}
+
+function sanitizeCause(cause) {
+  if (!cause || typeof cause !== "object") return undefined;
+
+  const code = sanitizeDiagnosticText(cause.code);
+  const description = sanitizeDiagnosticText(cause.description);
+  if (!code && !description) return undefined;
+
+  return {
+    ...(code ? { code } : {}),
+    ...(description ? { description } : {}),
+  };
+}
+
+export function extractMercadoPagoError(error) {
+  const httpStatus = Number(error?.status);
+  const causes = Array.isArray(error?.causes)
+    ? error.causes.map(sanitizeCause).filter(Boolean)
+    : [];
+
+  return {
+    http_status: Number.isInteger(httpStatus) && httpStatus > 0 ? httpStatus : undefined,
+    status: sanitizeDiagnosticText(error?.payment_status),
+    status_detail: sanitizeDiagnosticText(error?.status_detail),
+    error_code: sanitizeDiagnosticText(error?.error),
+    message: sanitizeDiagnosticText(error?.message) || "Mercado Pago no entregó un mensaje.",
+    cause: causes,
+  };
+}
+
+export function shouldReturnDiagnostics(environment = process.env) {
+  return environment.NODE_ENV === "development" || environment.VERCEL_ENV === "preview";
+}
+
+function summarizePaymentBody(body, quantity) {
+  return {
+    quantity,
+    transaction_amount: body.transaction_amount,
+    payment_method_id: body.payment_method_id,
+    issuer_id: body.issuer_id,
+    installments: body.installments,
+    token_present: Boolean(body.token),
+    payer_email_present: Boolean(body.payer?.email),
+    payer_identification_type: body.payer?.identification?.type,
+    payer_identification_present: Boolean(body.payer?.identification?.number),
+  };
 }
 
 function buildPayer(payer) {
@@ -128,9 +185,19 @@ export default async function handler(request, response) {
       options: { timeout: 10000 },
     });
     const payment = new Payment(client);
+
+    console.info("Solicitud segura enviada a Mercado Pago:", summarizePaymentBody(body, request.body.quantity));
+
     const result = await payment.create({
       body,
       requestOptions: { idempotencyKey },
+    });
+
+    console.info("Respuesta de pago de Mercado Pago:", {
+      http_status: 200,
+      payment_id: result.id,
+      status: result.status,
+      status_detail: result.status_detail,
     });
 
     return response.status(200).json({
@@ -139,14 +206,19 @@ export default async function handler(request, response) {
       status_detail: result.status_detail,
     });
   } catch (error) {
-    console.error("Error al procesar el pago con Mercado Pago:", {
-      status: error?.status,
-      message: error?.message,
-    });
-    const mercadoPagoStatus = Number(error?.status);
+    const diagnostic = extractMercadoPagoError(error);
+    console.error("Error seguro devuelto por Mercado Pago:", diagnostic);
+
+    const mercadoPagoStatus = diagnostic.http_status;
     const responseStatus = mercadoPagoStatus >= 400 && mercadoPagoStatus < 500 ? 400 : 502;
-    return response.status(responseStatus).json({
+    const payload = {
       error: "No pudimos procesar el pago. Intenta nuevamente.",
-    });
+    };
+
+    if (shouldReturnDiagnostics()) {
+      payload.diagnostic = diagnostic;
+    }
+
+    return response.status(responseStatus).json(payload);
   }
 }
